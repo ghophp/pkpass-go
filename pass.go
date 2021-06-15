@@ -111,44 +111,10 @@ func pem(tempDir, password string, cert io.Reader) error {
 // bundle will read all of the files in the passDir, create a manifest.json, and
 // add all files to the zip archive.
 func bundle(w *zip.Writer, passDir, tempDir string) error {
-	files, err := ioutil.ReadDir(passDir)
+	var m = make(map[string]string)
+	err := addToZip(w, m, passDir, "")
 	if err != nil {
 		return err
-	}
-
-	var m = make(map[string]string)
-	for _, fi := range files {
-		// Skip directories, they are meaningless in this situation
-		if fi.IsDir() {
-			continue
-		}
-
-		// Open the file in the directory
-		f, err := os.Open(filepath.Join(passDir, fi.Name()))
-		if err != nil {
-			return err
-		}
-
-		// Create the sha writer
-		hw := sha1.New()
-
-		// Create the zip writer
-		zw, err := w.Create(fi.Name())
-		if err != nil {
-			return err
-		}
-
-		mw := io.MultiWriter(hw, zw)
-
-		// Write the file to the zip writer
-		_, err = io.Copy(mw, f)
-		if err != nil {
-			return err
-		}
-
-		// Add the hash to a map, later we will json.Marshal this to make manifest.json
-		sha := hw.Sum(nil)
-		m[fi.Name()] = fmt.Sprintf("%x", sha)
 	}
 
 	// Create the file writer
@@ -170,6 +136,54 @@ func bundle(w *zip.Writer, passDir, tempDir string) error {
 	err = json.NewEncoder(mw).Encode(m)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func addToZip(w *zip.Writer, m map[string]string, basePath, baseInZip string) error {
+	files, err := ioutil.ReadDir(basePath)
+	if err != nil {
+		return err
+	}
+
+	for _, fi := range files {
+		// Skip directories, they are meaningless in this situation
+		if fi.IsDir() {
+			err := addToZip(w, m, filepath.Join(basePath, fi.Name()), fi.Name())
+			if err != nil {
+				return err
+			}
+		} else {
+			// Open the file in the directory
+			f, err := os.Open(filepath.Join(basePath, fi.Name()))
+			if err != nil {
+				return err
+			}
+
+			// Create the sha writer
+			hw := sha1.New()
+
+			fileInZip := filepath.Join(baseInZip, fi.Name())
+
+			// Create the zip writer
+			zw, err := w.Create(fileInZip)
+			if err != nil {
+				return err
+			}
+
+			mw := io.MultiWriter(hw, zw)
+
+			// Write the file to the zip writer
+			_, err = io.Copy(mw, f)
+			if err != nil {
+				return err
+			}
+
+			// Add the hash to a map, later we will json.Marshal this to make manifest.json
+			sha := hw.Sum(nil)
+			m[fileInZip] = fmt.Sprintf("%x", sha)
+		}
 	}
 
 	return nil

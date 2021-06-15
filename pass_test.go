@@ -1,26 +1,24 @@
-package pkpass_test
+package pkpass
 
 import (
 	"io"
 	"os"
 	"testing"
-
-	"github.com/huttotw/pkpass-go"
 )
 
 func TestNew(t *testing.T) {
-	cert, err := os.Open("Certificates.p12")
+	cert, err := os.Open("pass.p12")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer cert.Close()
 
-	r, err := pkpass.New("Coupon.pass", "", cert)
+	r, err := New("DroneEID.pass", "", cert)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	f, err := os.Create("Coupon.pkpass")
+	f, err := os.Create("DroneEID.pkpass")
 	if err != nil {
 		t.Fatal(err)
 	}
